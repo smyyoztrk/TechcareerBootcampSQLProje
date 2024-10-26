@@ -61,7 +61,7 @@ declare @OduncAlmaTarihi DATE;
 
 while @i < = 1000
 begin
-set @OduncAlmaTarihi = DATEADD(DAY, FLOOR(RAND()*365), GETDATE());
+set @OduncAlmaTarihi = DATEADD(DAY, -FLOOR(RAND()*365), GETDATE());
 insert into OduncAlmalar(KitapID, UyeID, OduncAlmaTarihi, TeslimTarihi)
 values
 (FLOOR (RAND()*12) + 1,FLOOR (RAND()*12) + 1, @OduncAlmaTarihi,  DATEADD(DAY, 15, @OduncAlmaTarihi))
@@ -95,6 +95,42 @@ END;
 
 
 EXEC OduncAlinanKitaplarTariheGore '2024-01-01', '2024-12-31';
+
+CREATE PROCEDURE OduncAlmaStogaGore
+    @kitapID INT,
+    @uyeID INT
+AS
+BEGIN
+    DECLARE @stok INT;
+
+    
+    BEGIN TRANSACTION;
+
+    
+    SELECT @stok = StokMiktari FROM Kitaplar WHERE KitapID = @kitapID;
+
+    IF @stok > 0
+    BEGIN
+      
+        INSERT INTO OduncAlmalar ( KitapID, UyeID, OduncAlmaTarihi, TeslimTarihi)
+        VALUES ( @kitapID, @uyeID, GETDATE(),DATEADD(DAY, 15, GETDATE()));
+
+        
+        UPDATE Kitaplar SET StokMiktari = StokMiktari - 1 WHERE KitapID = @kitapID
+
+        COMMIT TRANSACTION;
+        
+        PRINT 'Ödünç alma iþlemi baþarýlý';
+    END
+    ELSE
+    BEGIN
+        ROLLBACK TRANSACTION;
+
+        PRINT 'Stok yok, ödünç alma iþlemi yapýlamaz';
+    END
+END;
+
+EXEC OduncAlmaStogaGore @kitapID = 3, @uyeID = 1;
 
 CREATE PROCEDURE UyeBilgileriniGuncelle
   @UyeID INT,
@@ -164,7 +200,8 @@ end
 insert into Kitaplar(KitapAdi, Yazar, Yayinevi, BasimYili, StokMiktari)
 values ('Yüzüklerin Efendisi - Geri Dönüþ','J.R.R. Tolkien','Ýthaki Yayýnlarý',1954,3)
 
-delete from Kitaplar where KitapID=16
+DELETE FROM OduncAlmalar WHERE KitapID = 5;
+DELETE FROM Kitaplar WHERE KitapID = 5;
 
 /* View */
 
@@ -224,10 +261,17 @@ SET STATISTICS TIME ON;
 
 
 SELECT * FROM OduncAlmalar 
-WHERE OduncAlmaTarihi = '2025-08-09';
+WHERE OduncAlmaTarihi = '2024-08-09';
 
 SET STATISTICS IO OFF;
 SET STATISTICS TIME OFF;
 
 
 
+
+
+
+UPDATE OduncAlmalar
+SET OduncAlmaTarihi = DATEADD(DAY, -FLOOR(RAND(CHECKSUM(NEWID())) * 365), GETDATE()),
+    TeslimTarihi = DATEADD(DAY, 15, DATEADD(DAY, -FLOOR(RAND(CHECKSUM(NEWID())) * 365), GETDATE()))
+WHERE OduncAlmaTarihi > GETDATE();
